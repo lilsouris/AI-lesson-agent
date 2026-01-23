@@ -1,0 +1,60 @@
+{
+  "sectionTitle": "Les bases",
+  "chapterTitle": "Fondamentaux de l'argent et de l'épargne",
+  "lessons": [
+    {
+      "title": "Qu'est-ce que la bourse ?",
+      "description": [
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "text": "Introduction aux concepts fondamentaux de la bourse et des marchés financiers.",
+              "type": "text"
+            }
+          ]
+        }
+      ],
+      "order": 1,
+      "difficulty": "easy",
+      "estimatedDuration": 12,
+      "content": {
+        "textBlocks": [
+          {
+            "title": "Page 1",
+            "content": "La bourse, c'est quoi exactement ? Imagine un marché géant où des entreprises vendent des \"parts\" d'elles-mêmes pour lever de l'argent. Ces parts, ce sont les **actions**. Quand tu achètes une action, tu deviens propriétaire d'une toute petite partie de l'entreprise.\n\n**Pourquoi les entreprises entrent en bourse ?**\nElles ont besoin d'argent pour grandir : ouvrir de nouveaux magasins, développer de nouveaux produits, embaucher... Au lieu d'emprunter à la banque (et payer des intérêts), elles vendent des actions. C'est le **financement par capitaux propres**."
+          },
+          {
+            "title": "Page 2",
+            "content": "**Comment ça marche concrètement ?**\nTu passes un ordre d'achat via une application (comme Boursorama, Degiro, ou même ton app bancaire). Ton ordre arrive sur le marché, trouve un vendeur, et hop : tu es actionnaire ! Le prix d'une action fluctue selon la loi de l'offre et de la demande. Si beaucoup de gens veulent acheter, le prix monte. Si beaucoup veulent vendre, le prix baisse.\n\n**Les indices boursiers :** Le CAC 40 en France, le S&P 500 aux États-Unis... Ce sont des \"paniers\" d'actions qui donnent une idée de la santé globale du marché."
+          }
+        ],
+        "quizBlocks": [
+          {
+            "Question": "Qu'est-ce qu'une action ?",
+            "questionType": "multiple-choice",
+            "options": [
+              "Un prêt que tu fais à une entreprise",
+              "Une part de propriété d'une entreprise",
+              "Un placement garanti sans risque",
+              "Un compte d'épargne spécialisé"
+            ],
+            "correctAnswer": "Une part de propriété d'une entreprise",
+            "explanationcorrect": "Exactement ! Une action = une part de propriété. Tu es actionnaire, même si c'est une toute petite part. Ça te donne des droits (dividendes si l'entreprise en verse, droit de vote en assemblée générale) et des risques (tu peux perdre de l'argent si l'entreprise va mal).",
+            "explanationfalse": "Non ! Une action, c'est une part de propriété. Quand tu achètes une action, tu deviens propriétaire d'une petite partie de l'entreprise. Si l'entreprise réussit, la valeur de ton action peut augmenter. Si elle échoue, tu peux perdre de l'argent. C'est différent d'un prêt (où tu récupères ton capital + intérêts) ou d'un placement garanti.",
+            "points": 5
+          },
+          {
+            "Question": "Les entreprises entrent en bourse uniquement pour faire de la publicité.",
+            "questionType": "true-false",
+            "options": ["Vrai", "Faux"],
+            "correctAnswer": "Faux",
+            "explanationcorrect": "Absolument ! Les entreprises entrent en bourse pour lever des capitaux et financer leur développement. La visibilité médiatique est un bonus, mais ce n'est pas l'objectif principal. C'est un moyen de financement alternatif à l'emprunt bancaire.",
+            "explanationfalse": "C'est faux ! La raison principale, c'est de lever des fonds pour financer leur croissance. Entrer en bourse coûte cher (frais d'introduction, obligations réglementaires), donc ce n'est pas juste pour la pub. Les entreprises vendent des actions pour obtenir de l'argent sans s'endetter.",
+            "points": 5
+          }
+        ]
+      }
+    }
+  ]
+}

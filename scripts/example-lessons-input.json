@@ -1,0 +1,44 @@
+[
+  {
+    "title": "Qu'est-ce que la bourse ?",
+    "description": "Introduction aux concepts fondamentaux de la bourse et des marchés financiers.",
+    "order": 1,
+    "difficulty": "easy",
+    "topics": [
+      "Définition de la bourse",
+      "Pourquoi les entreprises entrent en bourse",
+      "Comment fonctionne le marché",
+      "Les indices boursiers (CAC 40, S&P 500)",
+      "Pourquoi investir en bourse",
+      "La règle d'or : investir pour le long terme"
+    ]
+  },
+  {
+    "title": "Actions vs obligations : comprendre la différence",
+    "description": "Apprendre à distinguer les actions des obligations et comprendre leurs caractéristiques.",
+    "order": 2,
+    "difficulty": "easy",
+    "topics": [
+      "Définition des actions (propriété)",
+      "Définition des obligations (prêt)",
+      "Comparaison concrète avec exemples",
+      "Le risque de défaut",
+      "Quand choisir quoi selon son profil",
+      "Le mix actions/obligations"
+    ]
+  },
+  {
+    "title": "Comment lire une cote boursière",
+    "description": "Apprendre à décrypter les informations affichées sur une action en bourse.",
+    "order": 3,
+    "difficulty": "easy",
+    "topics": [
+      "Le prix actuel",
+      "La variation journalière",
+      "Le volume d'échange",
+      "Le P/E (Price/Earnings)",
+      "Le dividende",
+      "Le marché et les horaires"
+    ]
+  }
+]
