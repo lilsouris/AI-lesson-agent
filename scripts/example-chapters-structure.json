@@ -1,0 +1,55 @@
+[
+  {
+    "title": "Chapitre 1 : Les bases de l'épargne",
+    "order": 1,
+    "lessons": [
+      {
+        "title": "Leçon 1.1 : Qu'est-ce que l'épargne ?",
+        "order": 1,
+        "topics": [
+          "Définition de l'épargne",
+          "Différence entre épargne et investissement",
+          "Pourquoi épargner",
+          "Les différents types d'épargne"
+        ]
+      },
+      {
+        "title": "Leçon 1.2 : Les produits d'épargne réglementés",
+        "order": 2,
+        "topics": [
+          "Livret A : caractéristiques et plafond",
+          "LDDS : Livret de Développement Durable et Solidaire",
+          "LEP : Livret d'Épargne Populaire",
+          "Comparaison des différents livrets"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Chapitre 2 : Construire son budget",
+    "order": 2,
+    "lessons": [
+      {
+        "title": "Leçon 2.1 : La règle 50/30/20",
+        "order": 1,
+        "topics": [
+          "Explication de la règle 50/30/20",
+          "50% pour les besoins essentiels",
+          "30% pour les envies",
+          "20% pour l'épargne",
+          "Comment adapter la règle à sa situation"
+        ]
+      },
+      {
+        "title": "Leçon 2.2 : Suivre ses dépenses",
+        "order": 2,
+        "topics": [
+          "Pourquoi suivre ses dépenses",
+          "Outils pour suivre ses dépenses",
+          "Catégoriser ses dépenses",
+          "Analyser ses habitudes de consommation"
+        ]
+      }
+    ]
+  }
+]
