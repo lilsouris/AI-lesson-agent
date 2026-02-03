@@ -387,21 +387,62 @@ IMPORTANT :
         slug = slug.strip('-')
         return slug
     
+    def _section_title(self, item: Dict) -> str:
+        """Extrait le titre d'une section (Strapi v4 peut mettre les champs dans attributes)."""
+        if item.get("title"):
+            return item["title"]
+        return (item.get("attributes") or {}).get("title") or ""
+
+    def _chapter_title(self, item: Dict) -> str:
+        """Extrait le titre d'un chapitre (Strapi v4 peut mettre les champs dans attributes)."""
+        if item.get("title"):
+            return item["title"]
+        return (item.get("attributes") or {}).get("title") or ""
+
+    def _chapter_order(self, item: Dict) -> int:
+        """Extrait l'ordre d'un chapitre pour le tri."""
+        o = item.get("order")
+        if o is not None:
+            return int(o)
+        return int((item.get("attributes") or {}).get("order", 0))
+
     def find_section_by_title(self, title: str) -> Optional[Dict]:
-        """Trouve une section existante par titre"""
+        """Trouve une section existante par titre (gère pagination et structure Strapi v4)."""
+        headers = {
+            "Authorization": f"Bearer {self.strapi_token}",
+            "Content-Type": "application/json"
+        }
         try:
+            # 1) Essai avec filtre
             response = requests.get(
                 f"{self.strapi_url}/api/sections",
-                headers={
-                    "Authorization": f"Bearer {self.strapi_token}",
-                    "Content-Type": "application/json"
+                headers=headers,
+                params={
+                    "filters[title][$eq]": title,
+                    "pagination[pageSize]": 100
                 },
-                params={"filters[title][$eq]": title},
                 timeout=30
             )
             response.raise_for_status()
-            data = response.json().get("data", [])
-            return data[0] if data else None
+            data = response.json().get("data") or []
+            if isinstance(data, list) and data:
+                return data[0]
+            # 2) Fallback : récupérer toutes les sections et chercher par titre
+            response = requests.get(
+                f"{self.strapi_url}/api/sections",
+                headers=headers,
+                params={"pagination[pageSize]": 100},
+                timeout=30
+            )
+            response.raise_for_status()
+            data = response.json().get("data") or []
+            if not isinstance(data, list):
+                return None
+            title_stripped = (title or "").strip()
+            for item in data:
+                if self._section_title(item).strip() == title_stripped:
+                    return item
+            return None
         except Exception as e:
             print(f"⚠️  Erreur lors de la recherche de section : {e}")
             return None
@@ -431,41 +472,49 @@ IMPORTANT :
         results["section_id"] = section["id"]
         print(f"✅ Section trouvée : ID {results['section_id']}")
         
-        # 2. Créer les chapitres et leurs leçons
+        # Chapitres existants dans la section (pour matching par titre)
+        existing_chapters = self.get_existing_chapters(results["section_id"])
+        # Ordre des chapitres déjà traités dans ce run (pour chaînage prerequisiteChapters)
+        previous_chapter_ids_in_run: List[int] = []
+        
+        # 2. Créer les chapitres et leurs leçons (liens section → chapitre, chapitre → leçon, prerequisiteChapters)
         for chapter_data in chapters_data:
             chapter_title = chapter_data.get("title", "Sans titre")
             print(f"\n📚 Traitement du chapitre : {chapter_title}")
             
-            # Vérifier si le chapitre existe déjà
-            existing_chapters = self.get_existing_chapters(results["section_id"])
             existing_chapter = next(
-                (c for c in existing_chapters if c["title"] == chapter_title),
+                (c for c in existing_chapters if self._chapter_title(c).strip() == chapter_title.strip()),
                 None
             )
             
             if existing_chapter and attach_to_existing_chapters:
                 chapter_id = existing_chapter["id"]
+                previous_chapter_ids_in_run.append(chapter_id)
                 print(f"✅ Utilisation du chapitre existant : ID {chapter_id}")
             else:
                 if existing_chapter:
                     print(f"⚠️  Chapitre '{chapter_title}' existe déjà, création d'un nouveau...")
                 
-                # Créer le chapitre
+                # prerequisiteChapters = chapitres déjà traités dans ce run (chaînage 1 → 2 → 3)
+                prerequisite_ids = list(previous_chapter_ids_in_run)
+                desc = chapter_data.get("description", f"Chapitre : {chapter_title}")
+                if isinstance(desc, str):
+                    desc = self.convert_markdown_to_richtext(desc)
                 chapter_payload = {
                     "data": {
                         "title": chapter_title,
-                        "description": self.convert_markdown_to_richtext(
-                            chapter_data.get("description", f"Chapitre : {chapter_title}")
-                        ),
-                        "order": chapter_data.get("order", len(existing_chapters) + 1),
+                        "description": desc,
+                        "order": chapter_data.get("order", len(previous_chapter_ids_in_run) + 1),
                         "section": results["section_id"],
                         "isActive": True,
                         "estimatedDuration": sum(
                             lesson.get("estimatedDuration", 15)
                             for lesson in chapter_data.get("lessons", [])
-                        )
+                        ),
                     }
                 }
+                if prerequisite_ids:
+                    chapter_payload["data"]["prerequisiteChapters"] = {"connect": prerequisite_ids}
                 
                 try:
                     response = requests.post(
@@ -479,7 +528,29 @@ IMPORTANT :
                     )
                     response.raise_for_status()
                     chapter_id = response.json()["data"]["id"]
-                    print(f"✅ Chapitre créé : ID {chapter_id}")
+                    previous_chapter_ids_in_run.append(chapter_id)
+                    print(f"✅ Chapitre créé : ID {chapter_id}" + (f" (prérequis: {prerequisite_ids})" if prerequisite_ids else ""))
+                    # Strapi n'applique souvent pas les relations sur POST : on fait un PUT pour les prérequis
+                    if prerequisite_ids:
+                        try:
+                            put_resp = requests.put(
+                                f"{self.strapi_url}/api/chapters/{chapter_id}",
+                                json={
+                                    "data": {
+                                        "prerequisiteChapters": {"connect": prerequisite_ids}
+                                    }
+                                },
+                                headers={
+                                    "Authorization": f"Bearer {self.strapi_token}",
+                                    "Content-Type": "application/json"
+                                },
+                                timeout=30
+                            )
+                            put_resp.raise_for_status()
+                            print(f"    ✅ Liens prerequisiteChapters mis à jour : {prerequisite_ids}")
+                        except Exception as put_e:
+                            results["errors"].append(f"prerequisiteChapters (chapitre {chapter_id}): {put_e}")
+                            print(f"    ⚠️  prerequisiteChapters non mis à jour : {put_e}")
                 except Exception as e:
                     error_msg = f"Erreur création chapitre '{chapter_title}': {e}"
                     results["errors"].append(error_msg)
@@ -567,6 +638,48 @@ def load_lessons_input(file_path: str) -> List[Dict[str, Any]]:
         return data.get("lessons", [])
 
 
+def normalize_loaded_content(agent: "ChapterAndLessonGeneratorAgent", chapters_data: List[Dict]) -> None:
+    """
+    Normalise le contenu chargé depuis un fichier (ex: généré par Cursor Chat).
+    - Convertit le markdown en Rich Text Blocks dans les text-blocks
+    - Convertit les options/explanation en Rich Text Blocks si ce sont des strings
+    - Calcule coinReward et ajoute lessonType/slug si manquants
+    """
+    for chapter in chapters_data:
+        for lesson in chapter.get("lessons", []):
+            content = lesson.get("content", {})
+            # Text blocks: convert markdown string → Rich Text Blocks
+            for tb in content.get("textBlocks", []):
+                if isinstance(tb.get("content"), str):
+                    tb["content"] = agent.convert_markdown_to_richtext(tb["content"])
+            # Quiz blocks: convert options/explanation strings → Rich Text Blocks
+            quiz_count = 0
+            for qb in content.get("quizBlocks", []):
+                quiz_count += 1
+                if isinstance(qb.get("options"), list):
+                    options_rt = []
+                    for opt in qb["options"]:
+                        if isinstance(opt, str):
+                            options_rt.append({
+                                "type": "paragraph",
+                                "children": [{"text": opt, "type": "text"}]
+                            })
+                        else:
+                            options_rt.append(opt)
+                    qb["options"] = options_rt
+                for key in ("explanationcorrect", "explanationfalse"):
+                    if isinstance(qb.get(key), str):
+                        qb[key] = agent.convert_markdown_to_richtext(qb[key])
+            lesson["coinReward"] = lesson.get("coinReward") or agent.calculate_coin_reward(quiz_count)
+            lesson.setdefault("lessonType", "quizz")
+            lesson.setdefault("isActive", True)
+            if "slug" not in lesson:
+                lesson["slug"] = agent._generate_slug(lesson["title"])
+            # Description leçon : string → Rich Text Blocks
+            if isinstance(lesson.get("description"), str):
+                lesson["description"] = [{"type": "paragraph", "children": [{"text": lesson["description"], "type": "text"}]}]
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Génère des chapitres et des leçons et les crée dans Strapi',
@@ -602,8 +715,8 @@ Exemples d'utilisation:
     args = parser.parse_args()
     
     # Validation
-    if not args.generate_chapters and not args.chapter:
-        parser.error("Vous devez spécifier soit --generate-chapters soit --chapter")
+    if not args.input and not args.generate_chapters and not args.chapter:
+        parser.error("Vous devez spécifier soit --generate-chapters, soit --chapter, soit --input")
     
     if args.chapter and not args.lessons and not args.input:
         parser.error("--chapter nécessite --lessons ou --input")
@@ -630,6 +743,9 @@ Exemples d'utilisation:
         with open(args.input, 'r', encoding='utf-8') as f:
             generated_content = json.load(f)
         chapters_data = generated_content.get("chapters", [])
+        # Normaliser le contenu (markdown → Rich Text, options string → blocks, coinReward, etc.)
+        normalize_loaded_content(agent, chapters_data)
+        print(f"✅ Contenu normalisé : {len(chapters_data)} chapitre(s)")
     elif args.generate_chapters:
         # Générer automatiquement des chapitres
         print(f"🤖 Génération automatique de {args.generate_chapters} chapitres...")

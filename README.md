@@ -48,6 +48,21 @@ L'agent :
 
 Voir `docs/chapter-generation-guide.md` pour plus de détails.
 
+### Option C : Générer dans Cursor Chat puis envoyer dans Strapi (recommandé)
+
+1. **Dans Cursor Chat** : demande à l’agent de générer le JSON des chapitres/leçons (en t’aidant du prompt dans `docs/cursor-prompt-generate-lessons.md`). L’agent écrit le fichier dans `output/`.
+2. **Tu valides** le fichier généré dans `output/`.
+3. **Tu envoies dans Strapi** (sans OpenAI, seulement le token Strapi) :
+   ```bash
+   export STRAPI_API_TOKEN="<ton_token>"
+   python3 python-agent/scripts-generate-chapters-and-lessons-agent.py \
+     --section "Lois et réglementations" \
+     --input output/lois-reglementations-generated.json \
+     --create
+   ```
+
+Voir `docs/workflow-cursor-generate-then-push.md` et `docs/cursor-prompt-generate-lessons.md`.
+
 ### Option B : Génération Manuelle (Chapitre Spécifique)
 
 ### Étape 1 : Créer un fichier d'entrée JSON
@@ -159,7 +174,9 @@ L'agent utilise la leçon **"L'inflation, ton ennemi silencieux"** du chapitre *
 
 ## 📚 Documentation
 
-- **Génération automatique de chapitres** : `docs/chapter-generation-guide.md` ⭐ NOUVEAU
+- **Générer dans Cursor puis push Strapi** : `docs/workflow-cursor-generate-then-push.md` ⭐
+- **Prompt à copier dans Cursor** : `docs/cursor-prompt-generate-lessons.md`
+- **Génération automatique de chapitres** : `docs/chapter-generation-guide.md`
 - **Template de prompt** : `docs/ai-agent-prompt-template.md`
 - **Template JSON Strapi** : `docs/strapi-lesson-template.json`
 - **Exemple d'entrée** : `scripts/example-lessons-input.json`
