@@ -20,6 +20,22 @@ import requests
 from openai import OpenAI
 
 
+def _rt_paragraph(text: str) -> Dict:
+    """One Rich Text paragraph block."""
+    return {"type": "paragraph", "children": [{"text": text, "type": "text"}]}
+
+
+def _ensure_explanation_rt(agent: "ChapterAndLessonGeneratorAgent", val: Any) -> List[Dict]:
+    """Ensure explanation is always a list of Rich Text blocks (never null for Strapi)."""
+    if val is None:
+        return []
+    if isinstance(val, str):
+        return agent.convert_markdown_to_richtext(val)
+    if isinstance(val, list):
+        return val
+    return []
+
+
 class ChapterAndLessonGeneratorAgent:
     """Agent AI pour générer des chapitres et des leçons selon le format Strapi exact"""
     
@@ -260,6 +276,11 @@ RÈGLES IMPORTANTES :
 - Contenu : Progressif, pédagogique, avec exemples concrets
 - Format Markdown : Pour le contenu des text-blocks (sera converti en Rich Text)
 - Options de quiz : Array de strings simples (sera converti en Rich Text Blocks)
+- Types de quiz : multiple-choice, true-false, matching, drag-order, drag-drop
+  - multiple-choice / true-false : options = liste de réponses, correctAnswer = texte exact de la bonne réponse
+  - matching : options = lignes A/1/B/2/C/3/..., correctAnswer = "A → 1, B → 2, C → 3, ..."
+  - drag-order : options = liste des éléments à classer (ordre aléatoire), correctAnswer = même liste dans le bon ordre, séparée par des virgules
+  - drag-drop (phrase à trous) : options = liste des mots à glisser (dont distracteurs), correctAnswer = phrase complète avec les trous remplis
 - Rich Text Blocks : Format [{"type": "paragraph", "children": [{"text": "...", "type": "text"}]}]
 
 Retourne UNIQUEMENT du JSON valide."""
@@ -318,7 +339,8 @@ IMPORTANT :
 - 6-8 questions par leçon avec feedback détaillé
 - Contenu progressif et pédagogique
 - Format Markdown pour les text-blocks
-- Options de quiz : array de strings simples
+- Options de quiz : array de strings (une par option). Pour drag-order/drag-drop/matching, respecte le format correctAnswer indiqué dans le prompt système.
+- explanationcorrect et explanationfalse : toujours des strings (sera converti en Rich Text)
 """
         
         try:
@@ -343,23 +365,32 @@ IMPORTANT :
                     if isinstance(tb.get("content"), str):
                         tb["content"] = self.convert_markdown_to_richtext(tb["content"])
                 
-                # Convert quiz options to Rich Text Blocks
+                # Quiz blocks: format Strapi (ref. "L'inflation, ton ennemi silencieux")
+                # options = Rich Text array; matching = 1 bloc avec \n; drag-order/drag-drop = 1 RT par item
                 quiz_count = 0
                 for qb in content.get("quizBlocks", []):
                     quiz_count += 1
-                    if isinstance(qb.get("options"), list):
-                        options_rt = []
-                        for opt in qb["options"]:
-                            if isinstance(opt, str):
-                                options_rt.append({
-                                    "type": "paragraph",
-                                    "children": [{"text": opt, "type": "text"}]
-                                })
-                        qb["options"] = options_rt
-                    
+                    qtype = (qb.get("questionType") or "multiple-choice").strip().lower()
+                    qb["questionType"] = qtype
+
+                    opts = qb.get("options")
+                    if opts is None or not isinstance(opts, list):
+                        qb["options"] = []
+                    else:
+                        if qtype == "matching":
+                            lines = [o if isinstance(o, str) else str(o) for o in opts]
+                            qb["options"] = [_rt_paragraph("\n".join(lines))]
+                        else:
+                            options_rt = []
+                            for opt in opts:
+                                if isinstance(opt, dict) and opt.get("type") == "paragraph":
+                                    options_rt.append(opt)
+                                else:
+                                    options_rt.append(_rt_paragraph(opt if isinstance(opt, str) else str(opt)))
+                            qb["options"] = options_rt
+
                     for key in ["explanationcorrect", "explanationfalse"]:
-                        if isinstance(qb.get(key), str):
-                            qb[key] = self.convert_markdown_to_richtext(qb[key])
+                        qb[key] = _ensure_explanation_rt(self, qb.get(key))
                 
                 lesson["coinReward"] = self.calculate_coin_reward(quiz_count)
                 lesson["lessonType"] = "quizz"
@@ -565,13 +596,32 @@ IMPORTANT :
                 
                 # Construire le content array (dynamic zone)
                 content_blocks = []
+                text_blocks = lesson.get("content", {}).get("textBlocks", [])
                 
                 # Ajouter les text-blocks
-                for tb in lesson.get("content", {}).get("textBlocks", []):
+                for page_idx, tb in enumerate(text_blocks, 1):
+                    # Le titre affiché dans Strapi doit être "Page 1", "Page 2", ...
+                    page_title = f"Page {page_idx}"
+                    original_title = tb.get("title") or ""
+                    content = tb.get("content", [])
+                    
+                    # Le titre d'origine doit être injecté dans le contenu, au début du bloc
+                    if original_title:
+                        if isinstance(content, list):
+                            # Rich Text Blocks : on ajoute un paragraphe en tête
+                            title_block = {
+                                "type": "paragraph",
+                                "children": [{"text": original_title, "type": "text"}]
+                            }
+                            content = [title_block] + content
+                        elif isinstance(content, str):
+                            # Fallback si jamais c'est encore du markdown brut
+                            content = f"{original_title}\n\n{content}"
+                    
                     content_blocks.append({
                         "__component": "lesson-content.text-block",
-                        "title": tb.get("title", f"Page {len([b for b in content_blocks if b.get('__component') == 'lesson-content.text-block']) + 1}"),
-                        "content": tb.get("content", []),
+                        "title": page_title,
+                        "content": content,
                         "highlight": tb.get("highlight", False)
                     })
                 
@@ -652,24 +702,51 @@ def normalize_loaded_content(agent: "ChapterAndLessonGeneratorAgent", chapters_d
             for tb in content.get("textBlocks", []):
                 if isinstance(tb.get("content"), str):
                     tb["content"] = agent.convert_markdown_to_richtext(tb["content"])
-            # Quiz blocks: convert options/explanation strings → Rich Text Blocks
+            # Quiz blocks: format Strapi (ref. leçon "L'inflation, ton ennemi silencieux")
+            # - options: toujours array de Rich Text blocks (1 par option sauf matching = 1 bloc avec \n)
+            # - explanationcorrect / explanationfalse: toujours array de Rich Text, jamais null
+            # - drag-order: options = items en ordre aléatoire, correctAnswer = même items en ordre correct (comma-separated)
+            # - drag-drop: options = mots à glisser, correctAnswer = phrase complète
+            # - matching: options = 1 bloc avec lignes A/1/B/2/..., correctAnswer = "A → 1, B → 2, ..."
             quiz_count = 0
             for qb in content.get("quizBlocks", []):
                 quiz_count += 1
-                if isinstance(qb.get("options"), list):
-                    options_rt = []
-                    for opt in qb["options"]:
-                        if isinstance(opt, str):
-                            options_rt.append({
-                                "type": "paragraph",
-                                "children": [{"text": opt, "type": "text"}]
-                            })
+                qtype = (qb.get("questionType") or "multiple-choice").strip().lower()
+                qb["questionType"] = qtype
+
+                opts = qb.get("options")
+                if opts is None or not isinstance(opts, list):
+                    qb["options"] = []
+                else:
+                    if qtype == "matching":
+                        # Un seul bloc avec toutes les lignes (A/1/B/2/...)
+                        if not opts or all(isinstance(o, dict) for o in opts):
+                            pass
                         else:
-                            options_rt.append(opt)
-                    qb["options"] = options_rt
+                            lines: List[str] = []
+                            for opt in opts:
+                                if isinstance(opt, str):
+                                    lines.append(opt)
+                                elif isinstance(opt, dict):
+                                    for child in (opt.get("children") or []):
+                                        if child.get("type") == "text":
+                                            lines.append(child.get("text", ""))
+                            if lines:
+                                qb["options"] = [_rt_paragraph("\n".join(lines))]
+                    else:
+                        # multiple-choice, true-false, drag-order, drag-drop: 1 option = 1 paragraphe RT
+                        options_rt = []
+                        for opt in opts:
+                            if isinstance(opt, dict) and opt.get("type") == "paragraph":
+                                options_rt.append(opt)
+                            elif isinstance(opt, str):
+                                options_rt.append(_rt_paragraph(opt))
+                            else:
+                                options_rt.append(_rt_paragraph(str(opt)))
+                        qb["options"] = options_rt
+
                 for key in ("explanationcorrect", "explanationfalse"):
-                    if isinstance(qb.get(key), str):
-                        qb[key] = agent.convert_markdown_to_richtext(qb[key])
+                    qb[key] = _ensure_explanation_rt(agent, qb.get(key))
             lesson["coinReward"] = lesson.get("coinReward") or agent.calculate_coin_reward(quiz_count)
             lesson.setdefault("lessonType", "quizz")
             lesson.setdefault("isActive", True)
