@@ -599,25 +599,27 @@ IMPORTANT :
                 text_blocks = lesson.get("content", {}).get("textBlocks", [])
                 
                 # Ajouter les text-blocks
+                # Format Strapi : titre du bloc = "Page 1", "Page 2", ... ; titre d'origine en tête du contenu
+                # Si le JSON a déjà title "Page 1" et le contenu commence par le titre d'origine, on ne préfixe pas
                 for page_idx, tb in enumerate(text_blocks, 1):
-                    # Le titre affiché dans Strapi doit être "Page 1", "Page 2", ...
-                    page_title = f"Page {page_idx}"
-                    original_title = tb.get("title") or ""
-                    content = tb.get("content", [])
-                    
-                    # Le titre d'origine doit être injecté dans le contenu, au début du bloc
-                    if original_title:
-                        if isinstance(content, list):
-                            # Rich Text Blocks : on ajoute un paragraphe en tête
-                            title_block = {
-                                "type": "paragraph",
-                                "children": [{"text": original_title, "type": "text"}]
-                            }
-                            content = [title_block] + content
-                        elif isinstance(content, str):
-                            # Fallback si jamais c'est encore du markdown brut
-                            content = f"{original_title}\n\n{content}"
-                    
+                    block_title = (tb.get("title") or "").strip()
+                    if block_title and re.match(r"^Page \d+$", block_title):
+                        page_title = block_title
+                        content = tb.get("content", [])
+                        # Ne pas préfixer : le contenu contient déjà le titre d'origine en tête
+                    else:
+                        page_title = f"Page {page_idx}"
+                        original_title = block_title or ""
+                        content = tb.get("content", [])
+                        if original_title:
+                            if isinstance(content, list):
+                                title_block = {
+                                    "type": "paragraph",
+                                    "children": [{"text": original_title, "type": "text"}]
+                                }
+                                content = [title_block] + content
+                            elif isinstance(content, str):
+                                content = f"{original_title}\n\n{content}"
                     content_blocks.append({
                         "__component": "lesson-content.text-block",
                         "title": page_title,

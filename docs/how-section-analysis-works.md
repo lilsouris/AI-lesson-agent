@@ -40,19 +40,19 @@ L'agent génère de nouveaux chapitres qui :
 
 ### Exemple 1 : Section "Les bases"
 
-**Chapitres existants :**
+**Structure cible (10 chapitres pour une bonne progression débutant) :**
 1. Fondamentaux de l'argent et de l'épargne
 2. Préparer sa stratégie d'investissement
 3. Introduction aux investissements
-4. Les mécanismes de l'investissement
-5. Le lointain futur
+4. Gérer son budget et son épargne
+5. Les frais : comprendre pour mieux choisir
+6. Passer à l'action : ouvrir et utiliser un compte
+7. Épargner régulièrement : la régularité paye
+8. Rester serein et patient
+9. Protéger et diversifier son épargne
+10. Et après ? Consolider et aller plus loin
 
-**Chapitres générés (exemples) :**
-6. Gérer son budget efficacement
-7. Comprendre les risques financiers
-8. Les outils d'investissement modernes
-
-→ **Cohérent avec le thème "Les bases"** (fondamentaux, débutant)
+**Contenu pré-généré (chapitres 4 à 10) :** Le fichier `output/les-bases-chapitres-4-a-10.json` contient les 7 chapitres de remplacement/ajout (ordres 4 à 10), avec des leçons **sans doublon** avec le contenu déjà présent dans Strapi (ch1–ch3 et anciens ch4–ch5). Pour analyser le contenu existant : `python scripts/fetch-les-bases-content.py` (sauvegarde dans `output/les-bases-existing-content.json`). Génération du JSON : `python scripts/build-les-bases-chapitres-4-a-10.py`. Pour pousser vers Strapi : supprimer ou désactiver dans Strapi les anciens chapitres 4 et 5 (Les mécanismes de l'investissement, Le lointain futur), puis `--section "Les bases" --input output/les-bases-chapitres-4-a-10.json --create`.
 
 ### Exemple 2 : Section "Bourse"
 
